@@ -1,0 +1,28 @@
+PARAMS=$@
+PCOUNT=${#PARAMS[@]}
+
+if [[ $PCOUNT -eq 1 ]]; then
+  echo "You must define at least the video device. Usually /dev/video0."
+fi
+
+v4l2-ctl --verbose -d $1 --set-fmt-video=width=1920,height=1080,pixelformat=1
+v4l2-ctl --verbose -d $1 --set-parm=30
+v4l2-ctl --verbose -d $1 -c power_line_frequency=1
+# v4l2-ctl --verbose -d $1 --set-audio-input=1
+# v4l2-ctl --verbose -d $1 -c audio_encoding=3
+
+#v4l2-ctl -d /dev/video1 --stream-to=- --stream-mmap | ffmpeg -re -i /dev/fd/0
+
+# v4l2-ctl -d $1 --stream-to=- --stream-mmap | gst-launch-0.10 -v -e \
+#       alsasrc device=$2 do-timestamp=true ! 'audio/x-raw-int,channels=2,rate=32000' ! queue ! ffenc_aac ! mux. \
+#       filesrc location=/dev/fd/0 do-timestamp=true ! queue ! h264parse ! tee name=t ! queue ! mux. \
+#       flvmux name=mux streamable=true ! queue ! rtmpsink location="rtmp://localhost/input/camera1 live=1"
+      # mp4mux name=mux ! queue ! filesink location=test.mp4
+
+./capture -d $1 -o | gst-launch-0.10 -v -e \
+      filesrc location=/dev/fd/0 do-timestamp=true ! queue ! h264parse ! tee name=t ! queue ! mux. \
+      alsasrc device=$2 do-timestamp=true ! 'audio/x-raw-int,channels=2,rate=32000' ! queue ! ffenc_aac ! mux. \
+      flvmux name=mux streamable=true ! queue ! rtmpsink location="rtmp://localhost:1935/input/camera1"
+      # mp4mux name=mux ! queue ! filesink location=test.mp4
+      # alsasrc device=$2 do-timestamp=true ! 'audio/x-raw-int,channels=2,rate=32000' ! queue ! ffenc_aac ! mux. \
+
